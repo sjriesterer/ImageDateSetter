@@ -1,10 +1,12 @@
 import os
 import re
+from pathlib import Path
 from datetime import datetime
 from PIL import Image, ExifTags
 import piexif
+import logging
 
-# Searches a folder and subfolders for files
+# Searches a folder and subfolders for files ending with an extension in EXTENSIONS
 # If file is missing the 'DateTimeOriginal' EXIF tag
 #   - Extracts the date from the filename matching these conditions:
 #       - yyyyFilename
@@ -20,14 +22,39 @@ import piexif
 # -------------------------------------------------------------------
 # GLOBALS
 # -------------------------------------------------------------------
-DEBUG = False
-FOLDER_PATH = r'E:\Pictures\Photos\Test'
+DEBUG = False # For debugging printouts
+FOLDER_PATH = r'E:\Pictures\Photos\Test' # Root folder to search
+EXTENSIONS = ['.jpg', '.png', '.heic'] # Only files with these extensions will be processed
+LOG_FILE = 'set_date_log.txt' # Output to logs to this file
+APPEND = False # Appends log statements to file if true
+
+# -------------------------------------------------------------------
+# CONFIG
+# -------------------------------------------------------------------
+# Delete the log file if APPEND is False
+if not APPEND and os.path.exists(LOG_FILE):
+    os.remove(LOG_FILE)
+
+# Configure logging to write to both file and console
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s ` %(levelname)s ` %(message)s'
+)
+
+# Create a StreamHandler to print log messages to the console
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)  # Set the desired logging level for the console
+console_formatter = logging.Formatter('%(asctime)s ` %(levelname)s ` %(message)s')
+console_handler.setFormatter(console_formatter)
+
+# Add the StreamHandler to the root logger
+logging.getLogger().addHandler(console_handler)
 
 # -------------------------------------------------------------------
 # METHODS
 # -------------------------------------------------------------------
 def extract_date_from_filename(filename):
-    global DEBUG
     def match_pattern(pattern):
         match = re.search(pattern, filename)
         return match.group(1) if match else None
@@ -56,7 +83,6 @@ def extract_date_from_filename(filename):
 # -------------------------------------------------------------------
 
 def set_date_taken(filename, new_date):
-    global DEBUG
     try:
         exif_dict = piexif.load(filename)
         # new_date = datetime(2018, 1, 1, 0, 0, 0).strftime("%Y:%m:%d %H:%M:%S")
@@ -65,15 +91,13 @@ def set_date_taken(filename, new_date):
         exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = new_date
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, filename)
-        if DEBUG:
-            print("Date set")
+        logging.info(f"Date set ` {filename} ` {new_date}")
+        # print("Date set ' ", filename, " ` ", new_date)
     except (AttributeError, KeyError, IndexError, IOError) as e:
-        if DEBUG:
-            print(f"Error setting date taken for {filename}: {e}")
+        logging.info(f"Error setting date ` {filename} ` {new_date} ` {e}")
 # -------------------------------------------------------------------
 
 def is_datetime_original_set(image_path):
-    global DEBUG
     try:
         img = Image.open(image_path)
 
@@ -82,8 +106,9 @@ def is_datetime_original_set(image_path):
 
         # Check if DateTimeOriginal tag is present
         if piexif.ExifIFD.DateTimeOriginal in exif_dict["Exif"]:
-            if DEBUG:
-                print("DateTimeOriginal is set:", exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal])
+            # print("Set Previously ` ", image_path, " ` ", exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal])
+            logging.info(f"Set Previously ` {image_path} ` {exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal]}")
+
             return True
         else:
             if DEBUG:
@@ -97,13 +122,17 @@ def is_datetime_original_set(image_path):
 # -------------------------------------------------------------------
 
 def process_files(folder_path):
-    global DEBUG
     for filename in os.listdir(folder_path):
         if DEBUG:
             print("\n---------\nProcessing : ", filename)
         file_path = os.path.join(folder_path, filename)
         if DEBUG:
             print("file path : ", file_path)
+        
+        # Check if the file has an allowed extension
+        if Path(file_path).suffix.lower() not in EXTENSIONS:
+            continue
+
         if os.path.isfile(file_path):
             date_set = is_datetime_original_set(file_path)
             if not date_set:
