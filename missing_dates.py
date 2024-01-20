@@ -22,10 +22,11 @@ import logging
 # -------------------------------------------------------------------
 # GLOBALS
 # -------------------------------------------------------------------
-DEBUG = False # For debugging printouts
-FOLDER_PATH = r'E:\Pictures\Photos\Test' # Root folder to search
+DEBUG = True # For debugging printouts
+FOLDER_PATH = r'E:\Pictures\Photos\1990' # Root folder to search
+FOLDER_PATH = r'E:\Photos\1990' # Root folder to search
 EXTENSIONS = ['.jpg', '.png', '.heic'] # Only files with these extensions will be processed
-LOG_FILE = 'set_date_log.txt' # Output to logs to this file
+LOG_FILE = 'missing_dates_log.txt' # Output to logs to this file
 APPEND = False # Appends log statements to file if true
 
 # -------------------------------------------------------------------
@@ -54,49 +55,6 @@ logging.getLogger().addHandler(console_handler)
 # -------------------------------------------------------------------
 # METHODS
 # -------------------------------------------------------------------
-def extract_date_from_filename(filename):
-    def match_pattern(pattern):
-        match = re.search(pattern, filename)
-        return match.group(1) if match else None
-
-    date_patterns = {
-        'yyyy-mm-dd': r'(\d{4}-\d{1,2}-\d{1,2})',
-        'yyyy-mm-dd filename': r'(\d{4}-\d{1,2}-\d{1,2})(?:\s(.+))?',
-        'yyyy-mm filename.jpg': r'(\d{4}-\d{1,2})(?:\s(.+))?',
-        'yyyy filename.jpg': r'(\d{4})(?:\s(.+))?',
-    }
-
-    for pattern_name, pattern in date_patterns.items():
-        matched_date = match_pattern(pattern)
-        if matched_date:
-            if 'filename' in pattern_name and matched_date.count('-') < 2:
-                matched_date += '-01'  # Set day to 01 for patterns with 'filename' and only year-month
-            try:
-                new_date = datetime.strptime(matched_date, "%Y-%m-%d").strftime("%Y:%m:%d %H:%M:%S")
-                return new_date
-            except ValueError:
-                # Handle the case where only year and month are available
-                new_date = datetime.strptime(matched_date, "%Y-%m").strftime("%Y:%m:%d %H:%M:%S")
-                return new_date + '-01'
-
-    return None
-# -------------------------------------------------------------------
-
-def set_date_taken(filename, new_date):
-    try:
-        exif_dict = piexif.load(filename)
-        # new_date = datetime(2018, 1, 1, 0, 0, 0).strftime("%Y:%m:%d %H:%M:%S")
-        exif_dict['0th'][piexif.ImageIFD.DateTime] = new_date
-        exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = new_date
-        exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = new_date
-        exif_bytes = piexif.dump(exif_dict)
-        piexif.insert(exif_bytes, filename)
-        logging.info(f"Date set ` {filename} ` {new_date}")
-        # print("Date set ' ", filename, " ` ", new_date)
-    except (AttributeError, KeyError, IndexError, IOError) as e:
-        logging.info(f"Error setting date ` {filename} ` {new_date} ` {e}")
-# -------------------------------------------------------------------
-
 def is_datetime_original_set(image_path):
     try:
         img = Image.open(image_path)
@@ -106,13 +64,10 @@ def is_datetime_original_set(image_path):
 
         # Check if DateTimeOriginal tag is present
         if piexif.ExifIFD.DateTimeOriginal in exif_dict["Exif"]:
-            # print("Set Previously ` ", image_path, " ` ", exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal])
             logging.info(f"Set Previously ` {image_path} ` {exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal]}")
-
             return True
         else:
-            if DEBUG:
-                print("DateTimeOriginal is not set.")
+            logging.info(f"Not Set ` {image_path} ` ")
             return False
 
     except Exception as e:
@@ -130,22 +85,10 @@ def process_files(folder_path):
             print("file path : ", file_path)
         
         # Check if the file has an allowed extension
-        if Path(file_path).suffix.lower() not in EXTENSIONS:
+        if os.path.isfile(file_path) and Path(file_path).suffix.lower() not in EXTENSIONS:
             continue
-
-        if os.path.isfile(file_path):
+        else:
             date_set = is_datetime_original_set(file_path)
-            if not date_set:
-                if DEBUG:
-                    print("Extracting date from filename")
-                new_date = extract_date_from_filename(file_path)
-                if new_date:
-                    if DEBUG:
-                        print("Date extracted : ", new_date)
-                    set_date_taken(file_path, new_date)
-                else:
-                    if DEBUG:
-                        print("Date not extracted")
 
 # -------------------------------------------------------------------
 # SCRIPT
