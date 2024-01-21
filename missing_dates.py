@@ -15,7 +15,7 @@ from tqdm import tqdm
 # GLOBALS
 # -------------------------------------------------------------------
 DEBUG = False # For debugging printouts
-FOLDER_PATH = r'E:\Pictures\Photos' # Root folder to search
+FOLDER_PATH = r'E:\Pictures\Photos\2010' # Root folder to search
 EXTENSIONS = ['.jpg', '.png'] # Only files with these extensions will be processed
 IGNORE_DIRS = ['2000-00 Various'] # Will not process directories listed here
 LOG_FILE = 'missing_dates_log.txt' # Output to logs to this file
@@ -117,9 +117,9 @@ def process_files(folder_path):
 # -------------------------------------------------------------------
 process_files(FOLDER_PATH)
 
-print("\nDone processing images file:\n------------------------------")
+print("\nDone scanning images files:\n------------------------------")
 print("Images previously set: ", images_previously_set)
-print("Images set: ", images_not_set)
+print("Images not set: ", images_not_set)
 print("Images invalid: ", images_invalid)
 print("Images errror: ", images_error)
 print("------------------------------")

@@ -244,7 +244,7 @@ def process_files(folder_path):
 # -------------------------------------------------------------------
 process_files(FOLDER_PATH)
 
-print("\nDone processing images file:\n------------------------------")
+print("\nDone processing images files:\n------------------------------")
 print("Images set: ", images_set)
 print("Images forced set: ", images_forced)
 print("Images previously set: ", images_previously_set)
