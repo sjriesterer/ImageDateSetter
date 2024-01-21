@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from PIL import Image, ExifTags
 import piexif
+from tqdm import tqdm
 import logging
 
 # Searches a folder and subfolders for files ending with an extension in EXTENSIONS
@@ -25,15 +26,26 @@ import logging
 # -------------------------------------------------------------------
 # GLOBALS
 # -------------------------------------------------------------------
-DEBUG = True # For debugging printouts
-FOLDER_PATH = r'E:\Pictures\Photos\2008\2004' # Root folder to search
-FOLDER_PATH = r'E:\Photos' # Root folder to search
+DEBUG = False # For debugging printouts
+FOLDER_PATH = r'E:\Pictures\Photos\2009\2009-01' # Root folder to search
 EXTENSIONS = ['.jpg', '.png'] # Only files with these extensions will be processed
 IGNORE_DIRS = [] # Will not process directories listed here
 LOG_FILE = 'set_date_log.txt' # Output to logs to this file
 APPEND = True # Appends log statements to file if true
 PRINT_LOG = False # Prints the log statement to console if true
-FORCE_DATE = True # Will set the DateTime tag based on the filename even if already set
+FORCE_DATE = False # Will set the DateTime tag based on the filename even if already set
+
+# -------------------------------------------------------------------
+# COUNTERS
+# -------------------------------------------------------------------
+images_set = 0
+images_forced = 0
+images_invalid = 0
+images_invalid_image = 0
+images_error = 0
+images_previously_set = 0
+
+error_extracting_exif = False
 
 # -------------------------------------------------------------------
 # CONFIG
@@ -124,6 +136,11 @@ def extract_date_from_filename(file_path):
 # -------------------------------------------------------------------
 
 def set_date_taken(filename, new_date, previous_date):
+    global images_set
+    global images_forced
+    global images_invalid
+    global images_invalid_image
+
     try:
         exif_dict = piexif.load(filename)
         # new_date = datetime(2018, 1, 1, 0, 0, 0).strftime("%Y:%m:%d %H:%M:%S")
@@ -133,16 +150,24 @@ def set_date_taken(filename, new_date, previous_date):
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, filename)
         if previous_date is None:
+            images_set = images_set + 1
             logging.info(f"Date Set ` {filename} ` {new_date} ` ` ")
         else:
+            images_forced = images_forced + 1
             logging.info(f"Forced Date Set ` {filename} ` {new_date} ` {previous_date} ` ")
     except piexif.InvalidImageDataError:
+        images_invalid_image = images_invalid_image + 1
         logging.info(f"Not Image File ` {filename} ` {new_date} ` ` (Invalid Image Data)")
     except (AttributeError, KeyError, IndexError, IOError) as e:
+        images_error = images_error + 1
         logging.info(f"Error ` {filename} ` {new_date} ` ` {e}")
 # -------------------------------------------------------------------
 
 def is_datetime_original_set(image_path):
+    global images_previously_set
+    global images_error
+    global error_extracting_exif
+    
     try:
         img = Image.open(image_path)
 
@@ -153,6 +178,7 @@ def is_datetime_original_set(image_path):
         if piexif.ExifIFD.DateTimeOriginal in exif_dict["Exif"]:
             previous_date = exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal]
             if not FORCE_DATE:
+                images_previously_set = images_previously_set + 1
                 logging.info(f"Set Previously ` {image_path} ` {previous_date} ` ` ")
 
             return previous_date
@@ -162,17 +188,22 @@ def is_datetime_original_set(image_path):
             return None
 
     except Exception as e:
+        error_extracting_exif = True
+        images_error = images_error + 1
         logging.info(f"Error Extracting EXIF Tag ` {image_path} ` ` ` {e}")
         return None
 # -------------------------------------------------------------------
 
 def process_files(folder_path):
+    global images_invalid
+    global error_extracting_exif
+
     for root, dirs, files in os.walk(folder_path):
         # Check if any of the directories in IGNORE_DIRS are present in the current path
         if any(ignore_dir in root for ignore_dir in IGNORE_DIRS):
             continue
 
-        for filename in files:
+        for filename in tqdm(files, desc="Processing Files", unit="file"):
             if DEBUG:
                 print("\n---------\nProcessing : ", filename)
 
@@ -183,24 +214,40 @@ def process_files(folder_path):
 
             # Check if the file has an allowed extension
             if Path(file_path).suffix.lower() not in EXTENSIONS:
+                images_invalid = images_invalid + 1
                 logging.info(f"Invalid File ` {file_path} ` ` ` ")
                 continue
 
             date_set = is_datetime_original_set(file_path)
             
             if date_set is None or FORCE_DATE:
-                if DEBUG:
-                    print("Extracting date from filename")
-                new_date = extract_date_from_filename(file_path)
-                if new_date:
-                    if DEBUG:
-                        print("Date extracted : ", new_date)
-                    set_date_taken(file_path, new_date, date_set)
+                if error_extracting_exif:
+                    error_extracting_exif = False
                 else:
                     if DEBUG:
-                        print("Date not extracted")
+                        print("Extracting date from filename")
+                    new_date = extract_date_from_filename(file_path)
+                    if new_date:
+                        if DEBUG:
+                            print("Date extracted : ", new_date)
+                        set_date_taken(file_path, new_date, date_set)
+                    else:
+                        if DEBUG:
+                            print("Date not extracted")
 
 # -------------------------------------------------------------------
 # SCRIPT
 # -------------------------------------------------------------------
 process_files(FOLDER_PATH)
+
+print("\nDone processing images file:\n------------------------------")
+print("Images set: ", images_set)
+print("Images forced set: ", images_forced)
+print("Images previously set: ", images_previously_set)
+print("Images invalid: ", images_invalid)
+print("Images invalid image: ", images_invalid_image)
+print("Images errror: ", images_error)
+print("------------------------------")
+total_files = images_set + images_forced + images_previously_set + images_invalid + images_invalid_image + images_error
+print("Total files: ", total_files)
+print("\n")
