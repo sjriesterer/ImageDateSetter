@@ -198,16 +198,20 @@ def process_files(folder_path):
     global images_invalid
     global error_extracting_exif
 
+    all_files = []
+
     for root, dirs, files in os.walk(folder_path):
         # Check if any of the directories in IGNORE_DIRS are present in the current path
         if any(ignore_dir in root for ignore_dir in IGNORE_DIRS):
             continue
 
-        for filename in tqdm(files, desc="Processing Files", unit="file"):
-            if DEBUG:
-                print("\n---------\nProcessing : ", filename)
+        all_files.extend(os.path.join(root, filename) for filename in files)
 
-            file_path = os.path.join(root, filename)
+        for file_path in tqdm(all_files, desc="Processing Files", unit="file", leave=False):
+            if DEBUG:
+                print("\n---------\nProcessing : ", file_path)
+
+            file_path = os.path.join(root, file_path)
 
             if DEBUG:
                 print("file path : ", file_path)
