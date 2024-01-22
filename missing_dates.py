@@ -15,9 +15,11 @@ from tqdm import tqdm
 # GLOBALS
 # -------------------------------------------------------------------
 DEBUG = False # For debugging printouts
-FOLDER_PATH = r'E:\Pictures\Photos\2010' # Root folder to search
-EXTENSIONS = ['.jpg', '.png'] # Only files with these extensions will be processed
-IGNORE_DIRS = ['2000-00 Various'] # Will not process directories listed here
+FOLDER_PATH = r'E:\Pictures\Photos\2014' # Root folder to search
+EXTENSIONS = ['.jpg', '.tiff'] # Only files with these extensions will be processed
+# IGNORE_DIRS = ['2000-00 Various'] # Will not process directories listed here
+IGNORE_DIRS = ['2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023',] # Will not process directories listed here
+IGNORE_DIRS = [] # Will not process directories listed here
 LOG_FILE = 'missing_dates_log.txt' # Output to logs to this file
 APPEND = False # Appends log statements to file if true
 PRINT_LOG = False # Prints the log statement to console if true
@@ -27,7 +29,7 @@ PRINT_LOG = False # Prints the log statement to console if true
 # -------------------------------------------------------------------
 images_previously_set = 0
 images_not_set = 0
-images_invalid = 0
+images_excluded = 0
 images_error = 0
 
 # -------------------------------------------------------------------
@@ -85,9 +87,10 @@ def is_datetime_original_set(image_path):
 # -------------------------------------------------------------------
 
 def process_files(folder_path):
-    global images_invalid
+    global images_excluded
 
     all_files = []
+
     for root, dirs, files in os.walk(folder_path):
         # Check if any of the directories in IGNORE_DIRS are present in the current path
         if any(ignore_dir in root for ignore_dir in IGNORE_DIRS):
@@ -95,7 +98,7 @@ def process_files(folder_path):
        
         all_files.extend(os.path.join(root, filename) for filename in files)
 
-    for file_path in tqdm(all_files, desc="Processing Files", unit="file", leave=False):
+    for file_path in tqdm(all_files, desc="Scanning Image Files", unit="file", leave=False):
         if DEBUG:
             print("\n---------\nProcessing : ", file_path)
 
@@ -106,7 +109,7 @@ def process_files(folder_path):
 
         # Check if the file has an allowed extension
         if os.path.isfile(file_path) and Path(file_path).suffix.lower() not in EXTENSIONS:
-            images_invalid = images_invalid + 1
+            images_excluded = images_excluded + 1
             logging.info(f"Invalid File ` {file_path} ` ` ")
             continue
         else:
@@ -117,12 +120,12 @@ def process_files(folder_path):
 # -------------------------------------------------------------------
 process_files(FOLDER_PATH)
 
-print("\nDone scanning images files:\n------------------------------")
+print("\nDone scanning images:\n---------------------------------")
 print("Images previously set: ", images_previously_set)
 print("Images not set: ", images_not_set)
-print("Images invalid: ", images_invalid)
-print("Images errror: ", images_error)
-print("------------------------------")
-total_files = images_not_set + images_previously_set + images_invalid + images_error
+print("Images excluded: ", images_excluded)
+print("Images error: ", images_error)
+print("---------------------------------")
+total_files = images_not_set + images_previously_set + images_excluded + images_error
 print("Total files: ", total_files)
 print("\n")
